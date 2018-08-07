@@ -6,7 +6,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/gwbeacon/connector/service"
+	"github.com/gwbeacon/gwbeacon/server/connector/service"
 	"github.com/gwbeacon/sdk/v1"
 	context "golang.org/x/net/context"
 	"google.golang.org/grpc"
