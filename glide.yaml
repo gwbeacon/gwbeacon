@@ -1,12 +1,10 @@
-package: github.com/gwbeacon/connector
+package: github.com/gwbeacon/gwbeacon
 import:
 - package: github.com/gwbeacon/sdk
   subpackages:
   - v1
-- package: golang.org/x/net
-  subpackages:
-  - context
+- package: golang.org/x/net/context
 - package: google.golang.org/grpc
-  version: ~1.14.0
+  version: ^1.14.0
   subpackages:
   - peer
