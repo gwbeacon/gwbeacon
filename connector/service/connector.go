@@ -3,31 +3,13 @@ package service
 import (
 	"crypto/md5"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
 	"github.com/gwbeacon/sdk/v1"
 	context "golang.org/x/net/context"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"
 )
-
-const (
-	QueryServiceName   = "query"
-	MessageServiceName = "message"
-	UserServiceName    = "user"
-	RosterServiceName  = "roster"
-	MUCServiceName     = "muc"
-)
-
-var typeNameMap = map[int32]string{
-	int32(v1.FeatureType_FeatureTypeQuery):   QueryServiceName,
-	int32(v1.FeatureType_FeatureTypeMessage): MessageServiceName,
-	int32(v1.FeatureType_FeatureTypeUser):    UserServiceName,
-	int32(v1.FeatureType_FeatureTypeRoster):  RosterServiceName,
-	int32(v1.FeatureType_FeatureTypeMUC):     MUCServiceName,
-}
 
 type clientManager struct {
 	sync.RWMutex
@@ -39,33 +21,6 @@ type ClientState struct {
 	user    *v1.UserInfo
 	client  *v1.ClientInfo
 	session *v1.Session
-}
-
-type Service interface {
-	RegisterService(gs *grpc.Server)
-	ServiceVersion() int32
-	ServiceType() int32
-}
-
-var allServices = make([]Service, 0)
-
-func Register(s Service) {
-	allServices = append(allServices, s)
-}
-
-func LoadAll(gs *grpc.Server) {
-	for _, s := range allServices {
-		log.Println("load service ", TypeToName(s.ServiceType()), s.ServiceVersion())
-		s.RegisterService(gs)
-	}
-}
-
-func GetAllServices() []Service {
-	return allServices
-}
-
-func TypeToName(tp int32) string {
-	return typeNameMap[tp]
 }
 
 var manager *clientManager

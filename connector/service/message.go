@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 
+	"github.com/gwbeacon/gwbeacon/lib"
 	"github.com/gwbeacon/sdk/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"
@@ -12,7 +13,7 @@ type MessageService struct {
 }
 
 func init() {
-	Register(&MessageService{})
+	lib.RegisterService(&MessageService{})
 }
 
 func (s *MessageService) RegisterService(gs *grpc.Server) {

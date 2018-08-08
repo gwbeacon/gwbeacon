@@ -1,6 +1,7 @@
 package service
 
 import (
+	"github.com/gwbeacon/gwbeacon/lib"
 	"github.com/gwbeacon/sdk/v1"
 	context "golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -10,7 +11,7 @@ type RosterService struct {
 }
 
 func init() {
-	Register(&RosterService{})
+	lib.RegisterService(&RosterService{})
 }
 
 func (s *RosterService) RegisterService(gs *grpc.Server) {

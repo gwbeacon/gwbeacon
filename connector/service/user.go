@@ -4,6 +4,7 @@ import (
 	context "golang.org/x/net/context"
 	"google.golang.org/grpc"
 
+	"github.com/gwbeacon/gwbeacon/lib"
 	"github.com/gwbeacon/sdk/v1"
 )
 
@@ -11,7 +12,7 @@ type UserService struct {
 }
 
 func init() {
-	Register(&UserService{})
+	lib.RegisterService(&UserService{})
 }
 
 func (s *UserService) RegisterService(gs *grpc.Server) {
