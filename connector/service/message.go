@@ -16,15 +16,15 @@ func init() {
 	lib.RegisterService(&MessageService{})
 }
 
-func (s *MessageService) RegisterService(gs *grpc.Server) {
+func (s *MessageService) Register(gs *grpc.Server) {
 	v1.RegisterMessageServiceServer(gs, s)
 }
 
-func (s *MessageService) ServiceVersion() int32 {
+func (s *MessageService) Version() int32 {
 	return int32(v1.SdkVersion_V1)
 }
 
-func (s *MessageService) ServiceType() int32 {
+func (s *MessageService) Type() int32 {
 	return int32(v1.FeatureType_FeatureTypeMessage)
 }
 

@@ -14,15 +14,15 @@ func init() {
 	lib.RegisterService(&RosterService{})
 }
 
-func (s *RosterService) RegisterService(gs *grpc.Server) {
+func (s *RosterService) Register(gs *grpc.Server) {
 	v1.RegisterRosterServiceServer(gs, s)
 }
 
-func (s *RosterService) ServiceVersion() int32 {
+func (s *RosterService) Version() int32 {
 	return int32(v1.SdkVersion_V1)
 }
 
-func (s *RosterService) ServiceType() int32 {
+func (s *RosterService) Type() int32 {
 	return int32(v1.FeatureType_FeatureTypeRoster)
 }
 

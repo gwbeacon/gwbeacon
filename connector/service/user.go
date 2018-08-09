@@ -15,22 +15,22 @@ func init() {
 	lib.RegisterService(&UserService{})
 }
 
-func (s *UserService) RegisterService(gs *grpc.Server) {
+func (s *UserService) Register(gs *grpc.Server) {
 	v1.RegisterUserServiceServer(gs, s)
 }
 
-func (s *UserService) ServiceVersion() int32 {
+func (s *UserService) Version() int32 {
 	return int32(v1.SdkVersion_V1)
 }
 
-func (s *UserService) ServiceType() int32 {
+func (s *UserService) Type() int32 {
 	return int32(v1.FeatureType_FeatureTypeUser)
 }
 
-func (s *UserService) Register(ctx context.Context, account *v1.UserAccount) (*v1.Result, error) {
+func (s *UserService) SignUp(ctx context.Context, account *v1.UserAccount) (*v1.Result, error) {
 	return nil, nil
 }
-func (s *UserService) Login(ctx context.Context, account *v1.UserAccount) (*v1.Result, error) {
+func (s *UserService) SignIn(ctx context.Context, account *v1.UserAccount) (*v1.Result, error) {
 	return nil, nil
 }
 func (s *UserService) RegisterClient(ctx context.Context, info *v1.ClientInfo) (*v1.Session, error) {

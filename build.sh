@@ -4,4 +4,6 @@ TOP_PATH=$(cd `dirname $0`;pwd)
 cd $TOP_PATH
 mkdir -p target/bin
 
-go build  -o target/bin/connector connector/connector.go
+protoc --go_out=plugins=grpc:./ lib/*.proto
+
+go build  -o target/bin/connector server/connector.go

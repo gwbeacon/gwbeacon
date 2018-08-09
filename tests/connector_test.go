@@ -12,7 +12,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-func TestConnector(t *testing.T) {
+func initServer(t *testing.T) {
 	lis, err := net.Listen("tcp", ":8888")
 	if err != nil {
 		t.Fatal(err)
@@ -20,10 +20,12 @@ func TestConnector(t *testing.T) {
 	}
 
 	server := grpc.NewServer()
-	lib.LoadAllService(server)
 	ch := make(chan int, 1)
 	go func() {
 		ch <- 1
+		go func() {
+			lib.LoadAllService(server)
+		}()
 		err = server.Serve(lis)
 		if err != nil {
 			t.Fatal(err)
@@ -33,7 +35,12 @@ func TestConnector(t *testing.T) {
 
 	t.Log(server.GetServiceInfo())
 	<-ch
+}
+
+func TestConnector(t *testing.T) {
+	//initServer(t)
 	conn, err := grpc.DialContext(context.Background(), "localhost:8888", grpc.WithInsecure())
+
 	if err != nil {
 		t.Fatal()
 		return

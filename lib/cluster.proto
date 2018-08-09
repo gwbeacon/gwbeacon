@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package lib;
+
+message ServiceInfo {
+    string Name = 1;
+    int32 Version = 2;
+}
+
+message ServerInfo {
+    string Type = 1;
+    uint32 ID = 2;
+    string IP = 3;
+    int32 Port = 4;
+    repeated ServiceInfo Services = 5;
+}
+
+message RegisterReturn {
+    uint32 ID = 1;
+    repeated ServerInfo NewServers = 2;
+    repeated ServerInfo DownServers = 3;
+}
+
+service Cluster {
+    rpc Register(ServerInfo) returns(stream RegisterReturn){}
+    rpc Sync(ServerInfo)returns(RegisterReturn){}
+}
+
