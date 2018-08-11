@@ -2,6 +2,7 @@ package service
 
 import (
 	"github.com/gwbeacon/gwbeacon/lib"
+	"github.com/gwbeacon/gwbeacon/lib/rpc"
 	"github.com/gwbeacon/sdk/v1"
 	context "golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -18,12 +19,11 @@ func (s *RosterService) Register(gs *grpc.Server) {
 	v1.RegisterRosterServiceServer(gs, s)
 }
 
-func (s *RosterService) Version() int32 {
-	return int32(v1.SdkVersion_V1)
-}
-
-func (s *RosterService) Type() int32 {
-	return int32(v1.FeatureType_FeatureTypeRoster)
+func (s *RosterService) GetInfo() *rpc.ServiceInfo {
+	return &rpc.ServiceInfo{
+		Version: int32(v1.SdkVersion_V1),
+		Name:    lib.FeatureRosterService,
+	}
 }
 
 func (s *RosterService) List(ctx context.Context, page *v1.Page) (*v1.RosterList, error) {

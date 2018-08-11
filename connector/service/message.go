@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/gwbeacon/gwbeacon/lib"
+	"github.com/gwbeacon/gwbeacon/lib/rpc"
 	"github.com/gwbeacon/sdk/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"
@@ -20,12 +21,11 @@ func (s *MessageService) Register(gs *grpc.Server) {
 	v1.RegisterMessageServiceServer(gs, s)
 }
 
-func (s *MessageService) Version() int32 {
-	return int32(v1.SdkVersion_V1)
-}
-
-func (s *MessageService) Type() int32 {
-	return int32(v1.FeatureType_FeatureTypeMessage)
+func (s *MessageService) GetInfo() *rpc.ServiceInfo {
+	return &rpc.ServiceInfo{
+		Version: int32(v1.SdkVersion_V1),
+		Name:    lib.FeatureMessageService,
+	}
 }
 
 func (s *MessageService) OnAckMessage(stream v1.MessageService_OnAckMessageServer) error {
@@ -38,10 +38,13 @@ func (s *MessageService) OnAckMessage(stream v1.MessageService_OnAckMessageServe
 }
 
 func (s *MessageService) OnChatMessage(stream v1.MessageService_OnChatMessageServer) error {
-	p, _ := peer.FromContext(stream.Context())
-	fmt.Println(p.Addr.String())
+	//ctx := stream.Context()
+	//session := ctx.Value(lib.ContextSessionKey)
 	for {
-		stream.Recv()
+		_, err := stream.Recv()
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

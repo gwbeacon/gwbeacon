@@ -1,6 +1,9 @@
 package lib
 
-import "time"
+import (
+	"sync/atomic"
+	"time"
+)
 
 const (
 	IndexOffset       = 0
@@ -16,9 +19,11 @@ const (
 	IDTypeBits      = 1
 )
 
+type IDType uint8
+
 const (
-	SessionIDType = 0
-	MessageIDType = 1
+	SessionIDType IDType = 0
+	MessageIDType IDType = 1
 )
 
 type ID uint64
@@ -29,22 +34,56 @@ func SetBaseTimestamp(ts uint64) {
 	baseTimestamp = ts
 }
 
-func MakeID(connID uint16, idx uint32, tp uint8) ID {
+type IDMaker interface {
+	ConnectorID() uint32
+	SetConnectorID(uint32)
+	Type() IDType
+	MakeID() ID
+}
+
+type idMaker struct {
+	connID uint32
+	idx    uint32
+	tp     IDType
+}
+
+func NewIDMaker(connID uint32, tp IDType) IDMaker {
+	return &idMaker{
+		connID: connID,
+		tp:     tp,
+		idx:    0,
+	}
+}
+
+func NewSessionIDMaker(connID uint32) IDMaker {
+	return NewIDMaker(connID, SessionIDType)
+}
+
+func NewMessageIDMaker(connID uint32) IDMaker {
+	return NewIDMaker(connID, MessageIDType)
+}
+
+func (im *idMaker) Type() IDType {
+	return im.tp
+}
+
+func (im *idMaker) ConnectorID() uint32 {
+	return im.connID
+}
+
+func (im *idMaker) SetConnectorID(id uint32) {
+	atomic.StoreUint32(&im.connID, id)
+}
+
+func (im *idMaker) MakeID() ID {
+	idx := atomic.AddUint32((*uint32)(&im.idx), 1)
 	var id uint64 = 0
 	tm := uint64(time.Now().Unix()) - baseTimestamp
 	id |= GetBits(uint64(idx), IndexBits, 0) << IndexOffset
 	id |= GetBits(uint64(tm), TimestampBits, 0) << TimestampOffset
-	id |= GetBits(uint64(connID), ConnectorIDBits, 0) << ConnectorIDOffset
-	id |= GetBits(uint64(tp), IDTypeBits, 0) << IDTypeOffset
+	id |= GetBits(uint64(im.connID), ConnectorIDBits, 0) << ConnectorIDOffset
+	id |= GetBits(uint64(im.tp), IDTypeBits, 0) << IDTypeOffset
 	return ID(id)
-}
-
-func MakeSessionID(connID uint16, idx uint32) ID {
-	return MakeID(connID, idx, SessionIDType)
-}
-
-func MakeMessageID(connID uint16, idx uint32, tp uint8) ID {
-	return MakeID(connID, idx, SessionIDType)
 }
 
 func Mask(bits uint64, offset uint64) uint64 {
@@ -84,9 +123,9 @@ func (id ID) GetConnectorID() uint16 {
 }
 
 func (id ID) IsMessageID() bool {
-	return id.getBits(IDTypeBits, IDTypeOffset) == MessageIDType
+	return id.getBits(IDTypeBits, IDTypeOffset) == uint64(MessageIDType)
 }
 
 func (id ID) IsSessionID() bool {
-	return id.getBits(IDTypeBits, IDTypeOffset) == SessionIDType
+	return id.getBits(IDTypeBits, IDTypeOffset) == uint64(SessionIDType)
 }

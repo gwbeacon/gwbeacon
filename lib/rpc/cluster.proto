@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package lib;
+package rpc;
 
 message ServiceInfo {
     string Name = 1;
@@ -15,14 +15,18 @@ message ServerInfo {
     repeated ServiceInfo Services = 5;
 }
 
+message ServerInfoIDMap {
+    map<uint32, ServerInfo> Servers = 1;
+}
+
 message RegisterReturn {
     uint32 ID = 1;
-    repeated ServerInfo NewServers = 2;
-    repeated ServerInfo DownServers = 3;
+    map<string, ServerInfoIDMap> NewServers = 2;
+    map<string, ServerInfoIDMap> DownServers = 3;
 }
 
 service Cluster {
-    rpc Register(ServerInfo) returns(stream RegisterReturn){}
+    rpc Register(stream ServerInfo) returns(stream RegisterReturn){}
     rpc Sync(ServerInfo)returns(RegisterReturn){}
 }
 

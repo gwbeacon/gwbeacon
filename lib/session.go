@@ -1,21 +1,27 @@
 package lib
 
 import (
-	"net"
 	"sync"
-
-	"google.golang.org/grpc"
-
-	context "golang.org/x/net/context"
 )
 
-type SessionData struct {
-	ID         ID
-	ClientIP   net.IP
-	ClientPort uint16
-	LoginTime  uint64
-	Client     ClientInfo
-	Extra      map[string]interface{}
+const (
+	ContextSessionKey = "gwbeacon_session"
+)
+
+type Session struct {
+	ID     ID
+	Addr   string
+	User   *UserInfo
+	Client *ClientInfo
+	Extra  map[string]interface{}
+}
+
+type UserInfo struct {
+	Name      string
+	Domain    string
+	Device    string
+	NickName  string
+	LoginTime uint64
 }
 
 type ClientInfo struct {
@@ -29,104 +35,106 @@ type ClientInfo struct {
 	DeviceNumber  string
 }
 
-type Session struct {
-	SessionData
+func NewSession(id ID, addr string) *Session {
+	return &Session{
+		ID:   id,
+		Addr: addr,
+	}
+}
+
+type SessionStore interface {
+	Store(s *Session)
+	Remove(id ID)
+	Count() int
+	Get(id ID) *Session
+	Find(user *UserInfo) []*Session
+}
+
+type sessionStore struct {
 	sync.RWMutex
-	ctx       context.Context
-	msgStream grpc.ServerStream
-	m         *SessionManager
+	data  map[ID]*Session
+	index map[string]map[string]map[string]*Session
 }
 
-type SessionManager struct {
-	sync.RWMutex
-	index    uint32
-	sessions map[ID]*Session
-	cache    sync.Pool
-}
-
-func NewSessionManager() *SessionManager {
-	m := &SessionManager{
-		sessions: make(map[ID]*Session),
-		cache: sync.Pool{
-			New: func() interface{} {
-				return &Session{}
-			},
-		},
+func NewSessionStore() SessionStore {
+	ss := &sessionStore{
+		data:  make(map[ID]*Session),
+		index: make(map[string]map[string]map[string]*Session),
 	}
-	return m
+	return ss
 }
 
-func (m *SessionManager) OpenSession(connectorID uint16, addr net.Addr) *Session {
-	m.Lock()
-	defer m.Unlock()
-	var port uint16
-	var ip net.IP
-	var id ID
-	switch v := addr.(type) {
-	case *net.TCPAddr:
-		port = uint16(v.Port)
-		ip = v.IP
-	}
-
-	for {
-		m.index++
-		if GetBits(uint64(m.index), IndexBits, 0) == 0 {
-			m.index = 1
+func (ss *sessionStore) Store(s *Session) {
+	ss.Lock()
+	defer ss.Unlock()
+	ss.data[s.ID] = s
+	if s.User != nil && s.User.LoginTime > 0 {
+		user := s.User
+		if _, ok := ss.index[user.Domain]; !ok {
+			ss.index[user.Domain] = make(map[string]map[string]*Session)
 		}
-		index := m.index
-		id = MakeSessionID(connectorID, index)
-		if _, ok := m.sessions[id]; !ok {
-			break
+		if _, ok := ss.index[user.Domain][user.Name]; !ok {
+			ss.index[user.Domain][user.Name] = make(map[string]*Session)
+		}
+		ss.index[user.Domain][user.Name][user.Device] = s
+	}
+}
+
+func (ss *sessionStore) Remove(id ID) {
+	ss.Lock()
+	defer ss.Unlock()
+	if s, ok := ss.data[id]; ok && s.User != nil {
+		user := s.User
+		if _, ok := ss.index[user.Domain]; !ok {
+			return
+		}
+		if _, ok := ss.index[user.Domain][user.Name]; !ok {
+			return
+		}
+		if _, ok := ss.index[user.Domain][user.Name][user.Device]; ok {
+			delete(ss.index[user.Domain][user.Name], user.Device)
+		}
+		if len(ss.index[user.Domain][user.Name]) == 0 {
+			delete(ss.index[user.Domain], user.Name)
+		}
+		if len(ss.index[user.Domain]) == 0 {
+			delete(ss.index, user.Domain)
 		}
 	}
-	s := m.cache.Get().(*Session)
-	s.SessionData = SessionData{
-		ID:         id,
-		ClientIP:   ip,
-		ClientPort: port,
+}
+
+func (ss *sessionStore) Count() int {
+	ss.Lock()
+	defer ss.Unlock()
+	return len(ss.data)
+}
+
+func (ss *sessionStore) Get(id ID) *Session {
+	ss.Lock()
+	defer ss.Unlock()
+	return ss.data[id]
+}
+
+func (ss *sessionStore) Find(user *UserInfo) []*Session {
+	ss.Lock()
+	defer ss.Unlock()
+	if user.Domain == "" || user.Name == "" {
+		return nil
 	}
-	s.m = m
-	m.sessions[id] = s
-	return s
-}
-
-func (m *SessionManager) GetSessionCount() int {
-	m.Lock()
-	defer m.Unlock()
-	return len(m.sessions)
-}
-
-func (m *SessionManager) CloseSession(id ID) {
-	m.Lock()
-	defer m.Unlock()
-	s, ok := m.sessions[id]
-	s.Lock()
-	defer s.Unlock()
-	if ok {
-		delete(m.sessions, id)
-		s.ID = 0
-		s.LoginTime = 0
-		s.Client = ClientInfo{}
-		s.Extra = nil
-		m.cache.Put(s)
+	if users, ok := ss.index[user.Domain]; ok {
+		if devices, ok := users[user.Name]; ok {
+			if user.Device != "" {
+				if s, ok := devices[user.Device]; ok {
+					return []*Session{s}
+				}
+			} else {
+				var ret = make([]*Session, 0)
+				for _, s := range devices {
+					ret = append(ret, s)
+				}
+				return ret
+			}
+		}
 	}
-}
-
-func (s *Session) UpdateClientInfo(c *ClientInfo) {
-	s.Lock()
-	defer s.Unlock()
-	s.SessionData.Client = *c
-}
-
-func (s *Session) SetExtra(key string, val interface{}) {
-	s.Lock()
-	defer s.Unlock()
-	if s.Extra == nil {
-		s.Extra = make(map[string]interface{})
-	}
-	s.Extra[key] = val
-}
-
-func (s *Session) Close() {
-	s.m.CloseSession(s.ID)
+	return nil
 }

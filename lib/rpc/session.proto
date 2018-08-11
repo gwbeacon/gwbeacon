@@ -1,0 +1,46 @@
+syntax="proto3";
+
+package rpc;
+
+message UserInfo {
+    string Name = 1;
+    string Domain = 2;
+    string Device = 3;
+    string NickName = 4;
+    uint64 LoginTime = 5;
+}
+
+message ClientInfo {
+    uint32 ClientType = 1;
+    string ClientVersion = 2;
+    string ProtoType = 3;
+    string ProtoVersion = 4;
+    uint32 OSType = 5;
+    string OSVersion = 6;
+    string DeviceType = 7;
+    string DeviceNumber = 8;
+}
+
+message Session {
+    uint64 ID = 1;
+    string Addr = 2;
+    UserInfo User = 3;
+    ClientInfo Client = 4;
+    map<string, string> Extra = 5;
+}
+
+message SessionRequest {
+    uint64 ID = 1;
+}
+
+message SessionResult {
+    bool Ok = 1;
+    repeated Session Data = 2;
+}
+
+service SessionStore {
+    rpc Store(Session)returns(SessionResult){}
+    rpc Remove(SessionRequest)returns(SessionResult){}
+    rpc Get(SessionRequest) returns(Session){}
+    rpc Find(UserInfo)returns(SessionResult){}
+}

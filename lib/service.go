@@ -3,37 +3,22 @@ package lib
 import (
 	"log"
 
-	"github.com/gwbeacon/sdk/v1"
+	"github.com/gwbeacon/gwbeacon/lib/rpc"
 	"google.golang.org/grpc"
 )
 
 const (
-	QueryServiceName   = "query"
-	MessageServiceName = "message"
-	UserServiceName    = "user"
-	RosterServiceName  = "roster"
-	MUCServiceName     = "muc"
+	FeatureConnector      = "connector"
+	FeatureQueryService   = "query"
+	FeatureMessageService = "message"
+	FeatureUserService    = "user"
+	FeatureRosterService  = "roster"
+	FeatureMUCService     = "muc"
 )
-
-var typeNameMap = map[int32]string{
-	int32(v1.FeatureType_FeatureTypeQuery):   QueryServiceName,
-	int32(v1.FeatureType_FeatureTypeMessage): MessageServiceName,
-	int32(v1.FeatureType_FeatureTypeUser):    UserServiceName,
-	int32(v1.FeatureType_FeatureTypeRoster):  RosterServiceName,
-	int32(v1.FeatureType_FeatureTypeMUC):     MUCServiceName,
-}
-
-func GetServiceInfo(s Service) *ServiceInfo {
-	return &ServiceInfo{
-		Name:    TypeToName(s.Type()),
-		Version: s.Version(),
-	}
-}
 
 type Service interface {
 	Register(gs *grpc.Server)
-	Version() int32
-	Type() int32
+	GetInfo() *rpc.ServiceInfo
 }
 
 var allServices = make([]Service, 0)
@@ -44,7 +29,7 @@ func RegisterService(s Service) {
 
 func LoadAllService(gs *grpc.Server) {
 	for _, s := range allServices {
-		log.Println("load service ", TypeToName(s.Type()), s.Version())
+		log.Println("load service ", s.GetInfo())
 		s.Register(gs)
 	}
 }
@@ -53,14 +38,10 @@ func GetAllServices() []Service {
 	return allServices
 }
 
-func GetAllServiceInfo() []*ServiceInfo {
-	res := make([]*ServiceInfo, 0)
+func GetAllServiceInfo() []*rpc.ServiceInfo {
+	res := make([]*rpc.ServiceInfo, 0)
 	for _, s := range GetAllServices() {
-		res = append(res, GetServiceInfo(s))
+		res = append(res, s.GetInfo())
 	}
 	return res
-}
-
-func TypeToName(tp int32) string {
-	return typeNameMap[tp]
 }
