@@ -12,7 +12,8 @@ message ServerInfo {
     uint32 ID = 2;
     string IP = 3;
     int32 Port = 4;
-    repeated ServiceInfo Services = 5;
+    int32 TimeBase = 5;
+    repeated ServiceInfo Services = 6;
 }
 
 message ServerInfoIDMap {

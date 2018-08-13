@@ -12,14 +12,17 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"
 
+	"time"
+
 	"github.com/gwbeacon/gwbeacon/lib/rpc"
 )
 
 type server struct {
 	sync.Mutex
-	ids     map[string]uint32
-	servers map[string]*rpc.ServerInfoIDMap
-	streams map[string]*StreamInfo
+	timeBase int32
+	ids      map[string]uint32
+	servers  map[string]*rpc.ServerInfoIDMap
+	streams  map[string]*StreamInfo
 }
 
 type StreamInfo struct {
@@ -29,11 +32,12 @@ type StreamInfo struct {
 	serverDown chan *rpc.ServerInfo
 }
 
-func NewServer() *server {
+func NewServer(timeBase int64) *server {
 	return &server{
-		ids:     make(map[string]uint32),
-		servers: make(map[string]*rpc.ServerInfoIDMap),
-		streams: make(map[string]*StreamInfo),
+		timeBase: int32(timeBase),
+		ids:      make(map[string]uint32),
+		servers:  make(map[string]*rpc.ServerInfoIDMap),
+		streams:  make(map[string]*StreamInfo),
 	}
 }
 
@@ -95,16 +99,19 @@ func (s *server) Register(stream rpc.Cluster_RegisterServer) error {
 	ctx := stream.Context()
 	p, ok := peer.FromContext(ctx)
 	if !ok {
+		s.Unlock()
 		return nil
 	}
 	info, err := stream.Recv()
 	if err != nil {
+		s.Unlock()
 		return err
 	}
 	switch v := p.Addr.(type) {
 	case *net.TCPAddr:
 		info.IP = v.IP.String()
 	default:
+		s.Unlock()
 		return errors.New(v.Network() + " is not supported")
 	}
 	addr := fmt.Sprintf("%s:%d", info.IP, info.Port)
@@ -117,14 +124,16 @@ func (s *server) Register(stream rpc.Cluster_RegisterServer) error {
 			s.ids[info.Type] = 1
 		}
 		info.ID = s.ids[info.Type]
+		info.TimeBase = s.timeBase
 		s.ids[info.Type]++
 		streamInfo = &StreamInfo{
 			info:       info,
 			serverDown: make(chan *rpc.ServerInfo, 10),
 			serverUp:   make(chan *rpc.ServerInfo, 10),
 		}
-		log.Println("register server", info)
+		s.streams[addr] = streamInfo
 	}
+	log.Println("register server", info)
 
 	stream.Send(&rpc.RegisterReturn{
 		ID:         info.ID,
@@ -142,7 +151,6 @@ func (s *server) Register(stream rpc.Cluster_RegisterServer) error {
 		}
 	}
 	s.servers[info.Type].Servers[info.ID] = info
-	s.streams[addr] = streamInfo
 	s.Unlock()
 	for {
 		select {
@@ -153,12 +161,14 @@ func (s *server) Register(stream rpc.Cluster_RegisterServer) error {
 			s.onServerDown(stream, down)
 			break
 		case <-ctx.Done():
+			s.Lock()
 			streamInfo.isDown = true
 			for _, stream1 := range s.streams {
 				if stream1 != streamInfo {
 					stream1.serverDown <- info
 				}
 			}
+			s.Unlock()
 			err := ctx.Err()
 			log.Println(ctx.Err())
 			return err
@@ -173,7 +183,10 @@ func (s *server) Sync(ctx context.Context, info *rpc.ServerInfo) (*rpc.RegisterR
 
 func main() {
 	var port = ""
+	var timeBase int64
 	flag.StringVar(&port, "port", "9999", "-port 9999")
+	now := time.Now().Unix()
+	flag.Int64Var(&timeBase, "timebase", now, "-timebase 1534061219")
 	flag.Parse()
 	lis, err := net.Listen("tcp", ":"+port)
 	if err != nil {
@@ -182,7 +195,7 @@ func main() {
 	}
 
 	server := grpc.NewServer()
-	rpc.RegisterClusterServer(server, NewServer())
+	rpc.RegisterClusterServer(server, NewServer(timeBase))
 	err = server.Serve(lis)
 	log.Println(err)
 }

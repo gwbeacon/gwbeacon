@@ -1,39 +1,38 @@
 package lib
 
 import (
+	"errors"
 	"fmt"
 	"log"
-
-	"golang.org/x/net/context"
-
-	"google.golang.org/grpc"
-
-	"sync"
-
-	"errors"
 	"net"
-
+	"sync"
 	"time"
 
 	"github.com/gwbeacon/gwbeacon/lib/rpc"
+	"golang.org/x/net/context"
+	"google.golang.org/grpc"
 )
 
-type ServerType string
-
-const (
-	RegisterServer  ServerType = "register"
-	ConnectorServer            = "connector"
-	UserServer                 = "user"
-	ChatServer                 = "chat"
-	RosterServer               = "roster"
-	MUCServer                  = "muc"
-)
+func ConvertIP(ip string) string {
+	if ip == "::1" {
+		return "[::1]"
+	}
+	return ip
+}
 
 type Server interface {
 	GetInfo() *rpc.ServerInfo
+	GetServers(tp string) map[uint32]*rpc.ServerInfo
 	Register(regAddr string, onIDChange func(uint32)) uint32
 	Serve(opt ...grpc.ServerOption) error
 	Stop()
+}
+
+type Connector interface {
+	Server
+	SessionStore
+	MakeSessionID() uint64
+	MakeMessageID() uint64
 }
 
 type server struct {
@@ -69,12 +68,21 @@ func NewServer(info ServerInfo, services []Service) Server {
 }
 
 func (s *server) GetInfo() *rpc.ServerInfo {
-	s.Lock()
-	defer s.Unlock()
+	s.RLock()
+	defer s.RUnlock()
 	return &s.info
 }
 
-func (s *server) Register(regAddr string, onIDChange func(uint32)) uint32 {
+func (s *server) GetServers(tp string) map[uint32]*rpc.ServerInfo {
+	s.RLock()
+	defer s.RUnlock()
+	if res, ok := s.serversInfo[tp]; ok {
+		return res
+	}
+	return map[uint32]*rpc.ServerInfo{}
+}
+
+func (s *server) Register(regAddr string, onIDChange func(id uint32)) uint32 {
 	s.Lock()
 	if s.registered {
 		s.Unlock()
@@ -83,7 +91,6 @@ func (s *server) Register(regAddr string, onIDChange func(uint32)) uint32 {
 	s.regAddr = regAddr
 	idNotify := make(chan uint32, 1)
 	s.onIDChange = func(id uint32) {
-		onIDChange(id)
 		idNotify <- id
 		close(idNotify)
 	}
@@ -98,6 +105,7 @@ func (s *server) Register(regAddr string, onIDChange func(uint32)) uint32 {
 		}
 	}()
 	id := <-idNotify
+	onIDChange(id)
 	s.Lock()
 	s.onIDChange = onIDChange
 	s.Unlock()
@@ -120,7 +128,6 @@ func (s *server) Serve(opt ...grpc.ServerOption) error {
 	for _, service := range s.services {
 		service.Register(server)
 	}
-	log.Println(server.GetServiceInfo())
 	s.grpcServer = server
 	s.Unlock()
 	log.Println("start server", s.info)
@@ -161,7 +168,6 @@ func (s *server) register() error {
 			conn.Close()
 			return err
 		}
-		fmt.Println("get server status from register", result)
 		s.Lock()
 		if result.ID > 0 {
 			s.info.ID = result.ID

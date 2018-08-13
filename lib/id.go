@@ -6,17 +6,17 @@ import (
 )
 
 const (
-	IndexOffset       = 0
-	TimestampOffset   = 19
-	ConnectorIDOffset = 50
-	IDTypeOffset      = 63
+	IndexOffset     = 0
+	TimestampOffset = 19
+	ServerIDOffset  = 50
+	IDTypeOffset    = 63
 )
 
 const (
-	IndexBits       = 19
-	TimestampBits   = 31
-	ConnectorIDBits = 13
-	IDTypeBits      = 1
+	IndexBits     = 19
+	TimestampBits = 31
+	ServerIDBits  = 13
+	IDTypeBits    = 1
 )
 
 type IDType uint8
@@ -28,60 +28,62 @@ const (
 
 type ID uint64
 
-var baseTimestamp uint64 = 0
+var timeBase int64 = time.Now().Unix()
 
-func SetBaseTimestamp(ts uint64) {
-	baseTimestamp = ts
+func SetTimeBase(ts int64) {
+	timeBase = ts
 }
 
 type IDMaker interface {
-	ConnectorID() uint32
-	SetConnectorID(uint32)
+	ServerID() uint32
+	SetServerID(uint32)
 	Type() IDType
 	MakeID() ID
 }
 
 type idMaker struct {
-	connID uint32
-	idx    uint32
-	tp     IDType
+	serverID uint32
+	idx      uint32
+	tp       IDType
+	timeBase int32
 }
 
-func NewIDMaker(connID uint32, tp IDType) IDMaker {
+func NewIDMaker(serverID uint32, tp IDType, timeBase int32) IDMaker {
 	return &idMaker{
-		connID: connID,
-		tp:     tp,
-		idx:    0,
+		serverID: serverID,
+		tp:       tp,
+		idx:      0,
+		timeBase: timeBase,
 	}
 }
 
-func NewSessionIDMaker(connID uint32) IDMaker {
-	return NewIDMaker(connID, SessionIDType)
+func NewSessionIDMaker(serverID uint32, timeBase int32) IDMaker {
+	return NewIDMaker(serverID, SessionIDType, timeBase)
 }
 
-func NewMessageIDMaker(connID uint32) IDMaker {
-	return NewIDMaker(connID, MessageIDType)
+func NewMessageIDMaker(serverID uint32, timeBase int32) IDMaker {
+	return NewIDMaker(serverID, MessageIDType, timeBase)
 }
 
 func (im *idMaker) Type() IDType {
 	return im.tp
 }
 
-func (im *idMaker) ConnectorID() uint32 {
-	return im.connID
+func (im *idMaker) ServerID() uint32 {
+	return im.serverID
 }
 
-func (im *idMaker) SetConnectorID(id uint32) {
-	atomic.StoreUint32(&im.connID, id)
+func (im *idMaker) SetServerID(id uint32) {
+	atomic.StoreUint32(&im.serverID, id)
 }
 
 func (im *idMaker) MakeID() ID {
 	idx := atomic.AddUint32((*uint32)(&im.idx), 1)
 	var id uint64 = 0
-	tm := uint64(time.Now().Unix()) - baseTimestamp
+	tm := uint64(time.Now().Unix() - timeBase)
 	id |= GetBits(uint64(idx), IndexBits, 0) << IndexOffset
 	id |= GetBits(uint64(tm), TimestampBits, 0) << TimestampOffset
-	id |= GetBits(uint64(im.connID), ConnectorIDBits, 0) << ConnectorIDOffset
+	id |= GetBits(uint64(im.serverID), ServerIDBits, 0) << ServerIDOffset
 	id |= GetBits(uint64(im.tp), IDTypeBits, 0) << IDTypeOffset
 	return ID(id)
 }
@@ -111,15 +113,15 @@ func (id ID) getBits(bits uint64, offset uint64) uint64 {
 }
 
 func (id ID) GetIndex() uint16 {
-	return uint16(id.getBits(ConnectorIDBits, ConnectorIDOffset))
+	return uint16(id.getBits(ServerIDBits, ServerIDOffset))
 }
 
 func (id ID) GetTimestamp() uint64 {
 	return uint64(id.getBits(TimestampBits, TimestampOffset))
 }
 
-func (id ID) GetConnectorID() uint16 {
-	return uint16(id.getBits(ConnectorIDBits, ConnectorIDOffset))
+func (id ID) GetServerID() uint16 {
+	return uint16(id.getBits(ServerIDBits, ServerIDOffset))
 }
 
 func (id ID) IsMessageID() bool {

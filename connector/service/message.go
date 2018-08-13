@@ -3,6 +3,8 @@ package service
 import (
 	"fmt"
 
+	"errors"
+
 	"github.com/gwbeacon/gwbeacon/lib"
 	"github.com/gwbeacon/gwbeacon/lib/rpc"
 	"github.com/gwbeacon/sdk/v1"
@@ -38,13 +40,21 @@ func (s *MessageService) OnAckMessage(stream v1.MessageService_OnAckMessageServe
 }
 
 func (s *MessageService) OnChatMessage(stream v1.MessageService_OnChatMessageServer) error {
-	//ctx := stream.Context()
-	//session := ctx.Value(lib.ContextSessionKey)
+	ctx := stream.Context()
+	session, ok := ctx.Value(lib.ContextSessionKey).(*rpc.Session)
+	if !ok || session.User == nil || session.User.LoginTime == 0 {
+		return errors.New("no session or not login")
+	}
+	connector, ok := ctx.Value(lib.ContextServerKey).(lib.Connector)
+	if !ok {
+		return errors.New("no connector")
+	}
 	for {
-		_, err := stream.Recv()
+		msg, err := stream.Recv()
 		if err != nil {
 			return err
 		}
+		msg.Id = connector.MakeMessageID()
 	}
 	return nil
 }

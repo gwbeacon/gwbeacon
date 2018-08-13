@@ -8,6 +8,8 @@ import (
 )
 
 const (
+	FeatureSession        = "session"
+	FeatureRegister       = "register"
 	FeatureConnector      = "connector"
 	FeatureQueryService   = "query"
 	FeatureMessageService = "message"

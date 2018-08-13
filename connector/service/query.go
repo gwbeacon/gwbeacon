@@ -28,7 +28,7 @@ func (s *QueryService) GetInfo() *rpc.ServiceInfo {
 }
 
 func (s *QueryService) GetFeatureList(ctx context.Context, q *v1.FeatureQuery) (*v1.FeatureList, error) {
-	sess, ok := ctx.Value("session").(*lib.Session)
+	sess, ok := ctx.Value("session").(*rpc.Session)
 	if ok {
 		log.Println(sess.ID)
 	}

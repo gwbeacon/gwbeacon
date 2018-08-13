@@ -6,4 +6,6 @@ mkdir -p target/bin
 
 protoc --go_out=plugins=grpc:./ lib/rpc/*.proto
 
-go build  -o target/bin/connector server/connector.go
+go build  -o target/bin/connector connector/*.go
+go build -o target/bin/register register/*.go
+go build -o target/bin/sessionStore session/*.go

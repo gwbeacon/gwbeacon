@@ -11,14 +11,15 @@ message UserInfo {
 }
 
 message ClientInfo {
-    uint32 ClientType = 1;
-    string ClientVersion = 2;
-    string ProtoType = 3;
-    string ProtoVersion = 4;
-    uint32 OSType = 5;
-    string OSVersion = 6;
-    string DeviceType = 7;
-    string DeviceNumber = 8;
+    map<string, string> Extra = 1;
+    uint32 ClientType = 2;
+    string ClientVersion = 3;
+    string ProtoType = 4;
+    string ProtoVersion = 5;
+    uint32 OSType = 6;
+    string OSVersion = 7;
+    string DeviceType = 8;
+    string DeviceNumber = 9;
 }
 
 message Session {
@@ -26,21 +27,26 @@ message Session {
     string Addr = 2;
     UserInfo User = 3;
     ClientInfo Client = 4;
-    map<string, string> Extra = 5;
-}
-
-message SessionRequest {
-    uint64 ID = 1;
 }
 
 message SessionResult {
-    bool Ok = 1;
-    repeated Session Data = 2;
+    repeated Session Data = 3;
+}
+
+message SessionStatRequest {
+}
+
+message SessionStat {
+    int32 Count = 1;
+    map<string, int32> DomainUsers = 2;
+    map<uint64, int32> ConnNumbers = 3;
 }
 
 service SessionStore {
-    rpc Store(Session)returns(SessionResult){}
-    rpc Remove(SessionRequest)returns(SessionResult){}
-    rpc Get(SessionRequest) returns(Session){}
-    rpc Find(UserInfo)returns(SessionResult){}
+	rpc Save(Session) returns(SessionResult){}
+	rpc Update(Session) returns(SessionResult){}
+    rpc Remove(Session)returns(SessionResult){}
+    rpc Replace(Session)returns(SessionResult){}
+	rpc Stat(SessionStatRequest) returns(SessionStat){}
+	rpc Get(Session) returns(SessionResult){}
 }
