@@ -5,6 +5,8 @@ import (
 
 	"errors"
 
+	"time"
+
 	"github.com/gwbeacon/gwbeacon/lib"
 	"github.com/gwbeacon/gwbeacon/lib/rpc"
 	"github.com/gwbeacon/sdk/v1"
@@ -13,6 +15,7 @@ import (
 )
 
 type MessageService struct {
+	ackStream v1.MessageService_OnAckMessageServer
 }
 
 func init() {
@@ -33,6 +36,7 @@ func (s *MessageService) GetInfo() *rpc.ServiceInfo {
 func (s *MessageService) OnAckMessage(stream v1.MessageService_OnAckMessageServer) error {
 	p, _ := peer.FromContext(stream.Context())
 	fmt.Println(p.Addr.String())
+	s.ackStream = stream
 	for {
 		stream.Recv()
 	}
@@ -49,12 +53,38 @@ func (s *MessageService) OnChatMessage(stream v1.MessageService_OnChatMessageSer
 	if !ok {
 		return errors.New("no connector")
 	}
+	connector.BindStream(session.ID, stream)
 	for {
 		msg, err := stream.Recv()
 		if err != nil {
+			stream.Context().Done()
+			return err
+		}
+		ack := &v1.AckMessage{
+			Domain: msg.Domain,
+			To:     msg.From,
+			From:   "",
+			Id:     msg.Id,
+		}
+		err = s.ackStream.Send(ack)
+		if err != nil {
+			stream.Context().Done()
 			return err
 		}
 		msg.Id = connector.MakeMessageID()
+		sess := &rpc.Session{
+			User: &rpc.UserInfo{
+				Name:   msg.To,
+				Domain: msg.Domain,
+			},
+		}
+		ret, err := connector.Get(sess)
+		if err == nil {
+			for _, ss := range ret {
+				st := connector.GetStream(ss.ID).(v1.MessageService_OnChatMessageServer)
+				st.Send(msg)
+			}
+		}
 	}
 	return nil
 }
@@ -63,7 +93,18 @@ func (s *MessageService) OnHeartbeat(stream v1.MessageService_OnHeartbeatServer)
 	p, _ := peer.FromContext(stream.Context())
 	fmt.Println(p.Addr.String())
 	for {
-		stream.Recv()
+		hb, err := stream.Recv()
+		if err != nil {
+			stream.Context().Done()
+			return err
+		}
+		hb.From = ""
+		hb.ServerTime = time.Now().Unix()
+		err = stream.Send(hb)
+		if err != nil {
+			stream.Context().Done()
+			return err
+		}
 	}
 	return nil
 }

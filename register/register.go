@@ -12,8 +12,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"
 
-	"time"
-
 	"github.com/gwbeacon/gwbeacon/lib/rpc"
 )
 
@@ -185,8 +183,7 @@ func main() {
 	var port = ""
 	var timeBase int64
 	flag.StringVar(&port, "port", "9999", "-port 9999")
-	now := time.Now().Unix()
-	flag.Int64Var(&timeBase, "timebase", now, "-timebase 1534061219")
+	flag.Int64Var(&timeBase, "timebase", 0, "-timebase 1534061219")
 	flag.Parse()
 	lis, err := net.Listen("tcp", ":"+port)
 	if err != nil {

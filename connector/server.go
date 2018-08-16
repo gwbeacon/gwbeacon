@@ -18,6 +18,7 @@ type server struct {
 	sync.RWMutex
 	lib.Server
 	lib.SessionStore
+	streams  map[uint64]interface{}
 	sidMaker lib.IDMaker
 	midMaker lib.IDMaker
 }
@@ -53,6 +54,26 @@ func (s *server) HandleConn(ctx context.Context, st stats.ConnStats) {
 		log.Println("close session:", session)
 	default:
 		log.Printf("illegal ConnStats type\n")
+	}
+}
+
+func (s *server) BindStream(sid uint64, stream interface{}) {
+	s.Lock()
+	defer s.Unlock()
+	s.streams[sid] = stream
+}
+
+func (s *server) GetStream(sid uint64) interface{} {
+	s.Lock()
+	defer s.Unlock()
+	return s.streams[sid]
+}
+
+func (s *server) RemoveStream(sid uint64) {
+	s.Lock()
+	defer s.Unlock()
+	if _, ok := s.streams[sid]; ok {
+		delete(s.streams, sid)
 	}
 }
 
@@ -103,7 +124,8 @@ func NewServer(port int32, regAddr string) lib.Connector {
 		Type: lib.FeatureConnector,
 	}
 	s := &server{
-		Server: lib.NewServer(info, lib.GetAllServices()),
+		Server:  lib.NewServer(info, lib.GetAllServices()),
+		streams: make(map[uint64]interface{}),
 	}
 	id := s.Register(regAddr, s.onIDChange)
 	log.Println(id)

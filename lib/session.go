@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"log"
 	"sync"
 
 	"errors"
@@ -51,6 +52,9 @@ func NewSessionStoreClient(serverAddr string, withCache bool) (SessionStore, err
 }
 
 func (ss *sessionStoreClient) Save(s *rpc.Session) error {
+	if s.User == nil {
+		return nil
+	}
 	_, err := ss.client.Save(context.Background(), s)
 	if err != nil {
 		return err
@@ -108,6 +112,9 @@ func (ss *sessionStoreClient) Get(s *rpc.Session) ([]*rpc.Session, error) {
 		}
 	}
 	res, err := ss.client.Get(context.Background(), s)
+	if err != nil {
+		return []*rpc.Session{}, err
+	}
 	return res.Data, err
 }
 
@@ -206,11 +213,19 @@ func (ss *sessionStoreServer) Stat() (*rpc.SessionStat, error) {
 }
 
 func (ss *sessionStoreServer) Get(s *rpc.Session) ([]*rpc.Session, error) {
+	var ret = make([]*rpc.Session, 0)
+	var err error = nil
 	if s.ID != 0 {
 		cache := ss.getCache(s.ID)
-		return cache.Get(s)
+		ret, err = cache.Get(s)
+	} else {
+		for _, cache := range ss.cache {
+			sess, _ := cache.Get(s)
+			ret = append(ret, sess...)
+		}
 	}
-	return nil, errors.New("not found")
+	log.Println("get session result", ret)
+	return ret, err
 }
 
 type sessionStore struct {
@@ -245,7 +260,12 @@ func (ss *sessionStore) save(s *rpc.Session) error {
 		if _, ok := ss.index[user.Domain][user.Name]; !ok {
 			ss.index[user.Domain][user.Name] = make(map[string]*rpc.Session)
 		}
-		ss.index[user.Domain][user.Name][user.Device] = s
+		s1 := ss.index[user.Domain][user.Name][user.Device]
+		if s1 == nil {
+			ss.index[user.Domain][user.Name][user.Device] = s
+		} else {
+			*s1 = *s
+		}
 	}
 	return nil
 }
@@ -260,7 +280,10 @@ func (ss *sessionStore) Update(s *rpc.Session) error {
 		if s.Client != nil {
 			session.Client = s.Client
 		}
+		log.Println("update", s)
 		return nil
+	} else {
+		return ss.save(s)
 	}
 	return errors.New("not found")
 }
@@ -350,6 +373,7 @@ func (ss *sessionStore) Stat() (*rpc.SessionStat, error) {
 func (ss *sessionStore) Get(s *rpc.Session) ([]*rpc.Session, error) {
 	ss.RLock()
 	defer ss.RUnlock()
+	log.Println("begin get session", s)
 	if s.ID != 0 {
 		if s1, ok := ss.data[s.ID]; ok {
 			return []*rpc.Session{s1}, nil
@@ -360,7 +384,7 @@ func (ss *sessionStore) Get(s *rpc.Session) ([]*rpc.Session, error) {
 			return []*rpc.Session{s1}, nil
 		}
 		return nil, errors.New("not found")
-	} else if s.User != nil && s.User.LoginTime != 0 {
+	} else if s.User != nil {
 		if users, ok := ss.index[s.User.Domain]; ok {
 			if devices, ok := users[s.User.Name]; ok {
 				if s.User.Device != "" {

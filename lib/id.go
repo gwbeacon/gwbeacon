@@ -28,7 +28,7 @@ const (
 
 type ID uint64
 
-var timeBase int64 = time.Now().Unix()
+var timeBase int64 = 0
 
 func SetTimeBase(ts int64) {
 	timeBase = ts

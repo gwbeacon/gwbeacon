@@ -31,6 +31,9 @@ type Server interface {
 type Connector interface {
 	Server
 	SessionStore
+	BindStream(sid uint64, ctx interface{})
+	GetStream(sid uint64) interface{}
+	RemoveStream(sid uint64)
 	MakeSessionID() uint64
 	MakeMessageID() uint64
 }

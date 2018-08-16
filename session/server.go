@@ -67,6 +67,7 @@ func (ss *sessionServer) Save(ctx context.Context, s *rpc.Session) (*rpc.Session
 
 func (ss *sessionServer) Update(ctx context.Context, s *rpc.Session) (*rpc.SessionResult, error) {
 	err := ss.cache.Update(s)
+	log.Println("update", s, err)
 	return &rpc.SessionResult{}, err
 }
 

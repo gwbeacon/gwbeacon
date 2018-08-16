@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"log"
 
 	context "golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -54,8 +55,9 @@ func (s *userService) SignIn(ctx context.Context, account *v1.UserAccount) (*v1.
 	}
 	info, err := s.GetInfo(ctx, user)
 	if err != nil {
-		return nil, err
+		log.Println(1, err)
 	}
+	info = &v1.UserInfo{}
 	session.User = &rpc.UserInfo{
 		Domain:    user.Domain,
 		Name:      user.Name,
@@ -63,7 +65,9 @@ func (s *userService) SignIn(ctx context.Context, account *v1.UserAccount) (*v1.
 		Device:    account.Device,
 		LoginTime: uint64(time.Now().Unix()),
 	}
+	session.Client = &rpc.ClientInfo{}
 	err = connector.Update(session)
+	log.Println(2, err)
 	return info, err
 }
 func (s *userService) RegisterClient(ctx context.Context, info *v1.ClientInfo) (*v1.Session, error) {
