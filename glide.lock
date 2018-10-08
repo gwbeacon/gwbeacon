@@ -1,0 +1,69 @@
+hash: b755baf0eb44a8d8ac4bed2ce2eea5a6ded09149371062e54aa89d20f3458471
+updated: 2018-10-08T20:46:45.626080054+08:00
+imports:
+- name: github.com/golang/protobuf
+  version: b4deda0973fb4c70b50d226b1af49f3da59f5265
+  subpackages:
+  - proto
+  - ptypes
+  - ptypes/any
+  - ptypes/duration
+  - ptypes/timestamp
+- name: github.com/gwbeacon/sdk
+  version: 7b5ced4416636b44949795b16ea9e31e2f323baf
+  subpackages:
+  - v1
+- name: golang.org/x/net
+  version: 146acd28ed5894421fb5aac80ca93bc1b1f46f87
+  subpackages:
+  - context
+  - http/httpguts
+  - http2
+  - http2/hpack
+  - idna
+  - internal/timeseries
+  - trace
+- name: golang.org/x/sys
+  version: 4497e2df6f9e69048a54498c7affbbec3294ad47
+  subpackages:
+  - unix
+- name: golang.org/x/text
+  version: 905a57155faa8230500121607930ebb9dd8e139c
+  subpackages:
+  - secure/bidirule
+  - transform
+  - unicode/bidi
+  - unicode/norm
+- name: google.golang.org/genproto
+  version: af9cb2a35e7f169ec875002c1829c9b315cddc04
+  subpackages:
+  - googleapis/rpc/status
+- name: google.golang.org/grpc
+  version: 32fb0ac620c32ba40a4626ddf94d90d12cce3455
+  subpackages:
+  - balancer
+  - balancer/base
+  - balancer/roundrobin
+  - codes
+  - connectivity
+  - credentials
+  - encoding
+  - encoding/proto
+  - grpclog
+  - internal
+  - internal/backoff
+  - internal/channelz
+  - internal/envconfig
+  - internal/grpcrand
+  - internal/transport
+  - keepalive
+  - metadata
+  - naming
+  - peer
+  - resolver
+  - resolver/dns
+  - resolver/passthrough
+  - stats
+  - status
+  - tap
+testImports: []
