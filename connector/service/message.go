@@ -1,17 +1,17 @@
 package service
 
 import (
-	"fmt"
+    "errors"
+    "fmt"
+    "google.golang.org/grpc/grpclog"
 
-	"errors"
+    "time"
 
-	"time"
-
-	"github.com/gwbeacon/gwbeacon/lib"
-	"github.com/gwbeacon/gwbeacon/lib/rpc"
-	"github.com/gwbeacon/sdk/v1"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/peer"
+    "github.com/gwbeacon/gwbeacon/lib"
+    "github.com/gwbeacon/gwbeacon/lib/rpc"
+    "github.com/gwbeacon/sdk/v1"
+    "google.golang.org/grpc"
+    "google.golang.org/grpc/peer"
 )
 
 type MessageService struct {
@@ -34,11 +34,19 @@ func (s *MessageService) GetInfo() *rpc.ServiceInfo {
 }
 
 func (s *MessageService) OnAckMessage(stream v1.MessageService_OnAckMessageServer) error {
-	p, _ := peer.FromContext(stream.Context())
-	fmt.Println(p.Addr.String())
+	ctx := stream.Context()
+	session, ok := ctx.Value(lib.ContextSessionKey).(*rpc.Session)
+	if !ok || session.User == nil || session.User.LoginTime == 0 {
+		return errors.New("no session or not login")
+	}
 	s.ackStream = stream
 	for {
-		stream.Recv()
+		_, err := stream.Recv()
+		if err != nil {
+			grpclog.Error(err)
+			stream.Context().Done()
+			return err
+		}
 	}
 	return nil
 }
@@ -82,7 +90,12 @@ func (s *MessageService) OnChatMessage(stream v1.MessageService_OnChatMessageSer
 		if err == nil {
 			for _, ss := range ret {
 				st := connector.GetStream(ss.ID).(v1.MessageService_OnChatMessageServer)
-				st.Send(msg)
+				err := st.Send(msg)
+				if err != nil {
+				    grpclog.Error(err)
+				    connector.Remove(ss)
+                    st.Context().Done()
+                }
 			}
 		}
 	}

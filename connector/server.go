@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"google.golang.org/grpc/peer"
 	"log"
+	"reflect"
 
 	"sync"
 
@@ -52,8 +54,15 @@ func (s *server) HandleConn(ctx context.Context, st stats.ConnStats) {
 	case *stats.ConnEnd:
 		s.Remove(session)
 		log.Println("close session:", session)
+	case *stats.ConnBegin:
+		p, ok := peer.FromContext(ctx)
+		if !ok {
+			return
+		}
+		addr := p.Addr.String()
+		log.Println("new connection:", addr)
 	default:
-		log.Printf("illegal ConnStats type\n")
+		log.Println("illegal ConnStats type:", reflect.TypeOf(st))
 	}
 }
 

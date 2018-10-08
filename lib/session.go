@@ -291,6 +291,7 @@ func (ss *sessionStore) Update(s *rpc.Session) error {
 func (ss *sessionStore) Remove(s *rpc.Session) ([]*rpc.Session, error) {
 	ss.Lock()
 	defer ss.Unlock()
+
 	if s.ID != 0 {
 		return ss.removeByID(s.ID)
 	} else if s.User != nil && s.User.LoginTime != 0 {
