@@ -27,7 +27,7 @@ message RegisterReturn {
 }
 
 service Cluster {
-    rpc Register(stream ServerInfo) returns(stream RegisterReturn){}
+    rpc DoRegister(stream ServerInfo) returns(stream RegisterReturn){}
     rpc Sync(ServerInfo)returns(RegisterReturn){}
 }
 

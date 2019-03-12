@@ -8,6 +8,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/grpc-ecosystem/go-grpc-middleware"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
+	"go.uber.org/zap"
+
 	"github.com/gwbeacon/gwbeacon/lib/rpc"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -51,14 +55,28 @@ type server struct {
 
 type ServerInfo struct {
 	Type string
-	Port int32
+	Port int
+}
+
+func DefaultOptions() []grpc.ServerOption {
+	zapLogger, _ := zap.NewDevelopment(zap.Development(), zap.AddCaller())
+	zap.RedirectStdLog(zapLogger)
+	options := []grpc.ServerOption{
+		grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(
+			grpc_zap.StreamServerInterceptor(zapLogger),
+		)),
+		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
+			grpc_zap.UnaryServerInterceptor(zapLogger),
+		)),
+	}
+	return options
 }
 
 func NewServer(info ServerInfo, services []Service) Server {
 	s := &server{
 		info: rpc.ServerInfo{
 			Type:     info.Type,
-			Port:     info.Port,
+			Port:     int32(info.Port),
 			Services: make([]*rpc.ServiceInfo, 0),
 		},
 		serversInfo: make(map[string]map[uint32]*rpc.ServerInfo),
@@ -115,15 +133,18 @@ func (s *server) Register(regAddr string, onIDChange func(id uint32)) uint32 {
 	return id
 }
 
-func (s *server) Serve(opt ...grpc.ServerOption) error {
+func (s *server) Serve(opts ...grpc.ServerOption) error {
 	addr := fmt.Sprintf(":%d", s.info.Port)
 	fmt.Println(addr)
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
-	defer lis.Close()
-	server := grpc.NewServer(opt...)
+	defer func() {
+		_ = lis.Close()
+	}()
+	opts = append(opts, DefaultOptions()...)
+	server := grpc.NewServer(opts...)
 	if server == nil {
 		return errors.New("create grpc server failed")
 	}
@@ -155,21 +176,22 @@ func (s *server) register() error {
 	}
 	fmt.Println("begin to register server", s.info)
 	client := rpc.NewClusterClient(conn)
-	stream, err := client.Register(context.Background())
+	stream, err := client.DoRegister(context.Background())
 	if err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return err
 	}
 	err = stream.Send(serverInfo)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return err
 	}
 	for {
-		result, err := stream.Recv()
-		if err != nil {
-			conn.Close()
-			return err
+		result, err1 := stream.Recv()
+		if err1 != nil {
+			_ = conn.Close()
+			err = err1
+			break
 		}
 		s.Lock()
 		if result.ID > 0 {
@@ -194,5 +216,5 @@ func (s *server) register() error {
 		}
 		s.Unlock()
 	}
-	return nil
+	return err
 }

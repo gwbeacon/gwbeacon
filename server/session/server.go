@@ -1,4 +1,4 @@
-package main
+package session
 
 import (
 	"log"
@@ -12,7 +12,7 @@ import (
 	"google.golang.org/grpc/stats"
 )
 
-type sessionServer struct {
+type server struct {
 	sync.RWMutex
 	lib.Server
 	cache   lib.SessionStore
@@ -20,14 +20,14 @@ type sessionServer struct {
 	idMaker lib.IDMaker
 }
 
-func (ss *sessionServer) TagRPC(ctx context.Context, info *stats.RPCTagInfo) context.Context {
+func (ss *server) TagRPC(ctx context.Context, info *stats.RPCTagInfo) context.Context {
 	return ctx
 }
 
-func (ss *sessionServer) HandleRPC(ctx context.Context, st stats.RPCStats) {
+func (ss *server) HandleRPC(ctx context.Context, st stats.RPCStats) {
 }
 
-func (ss *sessionServer) TagConn(ctx context.Context, info *stats.ConnTagInfo) context.Context {
+func (ss *server) TagConn(ctx context.Context, info *stats.ConnTagInfo) context.Context {
 	addr := info.RemoteAddr.String()
 	log.Println("new connection", addr)
 
@@ -39,7 +39,7 @@ func (ss *sessionServer) TagConn(ctx context.Context, info *stats.ConnTagInfo) c
 	return ctx
 }
 
-func (ss *sessionServer) HandleConn(ctx context.Context, st stats.ConnStats) {
+func (ss *server) HandleConn(ctx context.Context, st stats.ConnStats) {
 	sid, ok := ctx.Value(lib.ContextSessionKey).(uint64)
 	if !ok {
 		return
@@ -52,7 +52,7 @@ func (ss *sessionServer) HandleConn(ctx context.Context, st stats.ConnStats) {
 	}
 }
 
-func (ss *sessionServer) Save(ctx context.Context, s *rpc.Session) (*rpc.SessionResult, error) {
+func (ss *server) Save(ctx context.Context, s *rpc.Session) (*rpc.SessionResult, error) {
 	sid, _ := ctx.Value(lib.ContextSessionKey).(uint64)
 	ss.Lock()
 	if serverID, ok := ss.servers[sid]; !ok {
@@ -65,13 +65,13 @@ func (ss *sessionServer) Save(ctx context.Context, s *rpc.Session) (*rpc.Session
 	return &rpc.SessionResult{}, err
 }
 
-func (ss *sessionServer) Update(ctx context.Context, s *rpc.Session) (*rpc.SessionResult, error) {
+func (ss *server) Update(ctx context.Context, s *rpc.Session) (*rpc.SessionResult, error) {
 	err := ss.cache.Update(s)
 	log.Println("update", s, err)
 	return &rpc.SessionResult{}, err
 }
 
-func (ss *sessionServer) Remove(ctx context.Context, s *rpc.Session) (*rpc.SessionResult, error) {
+func (ss *server) Remove(ctx context.Context, s *rpc.Session) (*rpc.SessionResult, error) {
 	log.Println("remove session from session store server,", s)
 	res, err := ss.cache.Remove(s)
 	if err != nil {
@@ -80,7 +80,7 @@ func (ss *sessionServer) Remove(ctx context.Context, s *rpc.Session) (*rpc.Sessi
 	return &rpc.SessionResult{Data: res}, nil
 }
 
-func (ss *sessionServer) Replace(ctx context.Context, s *rpc.Session) (*rpc.SessionResult, error) {
+func (ss *server) Replace(ctx context.Context, s *rpc.Session) (*rpc.SessionResult, error) {
 	res, err := ss.cache.Replace(s)
 	if err != nil {
 		return &rpc.SessionResult{}, err
@@ -88,11 +88,11 @@ func (ss *sessionServer) Replace(ctx context.Context, s *rpc.Session) (*rpc.Sess
 	return &rpc.SessionResult{Data: res}, nil
 }
 
-func (ss *sessionServer) Stat(ctx context.Context, s *rpc.SessionStatRequest) (*rpc.SessionStat, error) {
+func (ss *server) Stat(ctx context.Context, s *rpc.SessionStatRequest) (*rpc.SessionStat, error) {
 	return ss.cache.Stat()
 }
 
-func (ss *sessionServer) Get(ctx context.Context, s *rpc.Session) (*rpc.SessionResult, error) {
+func (ss *server) Get(ctx context.Context, s *rpc.Session) (*rpc.SessionResult, error) {
 	res, err := ss.cache.Get(s)
 	if err != nil {
 		return &rpc.SessionResult{}, err
@@ -100,22 +100,22 @@ func (ss *sessionServer) Get(ctx context.Context, s *rpc.Session) (*rpc.SessionR
 	return &rpc.SessionResult{Data: res}, nil
 }
 
-type sessionService struct {
-	s *sessionServer
+type service struct {
+	s *server
 }
 
-func (ss *sessionService) Register(gs *grpc.Server) {
+func (ss *service) Register(gs *grpc.Server) {
 	rpc.RegisterSessionStoreServer(gs, ss.s)
 }
 
-func (ss *sessionService) GetInfo() *rpc.ServiceInfo {
+func (ss *service) GetInfo() *rpc.ServiceInfo {
 	return &rpc.ServiceInfo{
 		Name:    lib.FeatureSession,
 		Version: 1,
 	}
 }
 
-func (ss *sessionServer) onIDChange(id uint32) {
+func (ss *server) onIDChange(id uint32) {
 	ss.Lock()
 	if ss.idMaker == nil {
 		ss.idMaker = lib.NewIDMaker(id, lib.SessionIDType, 0)
@@ -124,20 +124,20 @@ func (ss *sessionServer) onIDChange(id uint32) {
 	ss.idMaker.SetServerID(id)
 }
 
-func (ss *sessionServer) Serve(opt ...grpc.ServerOption) error {
+func (ss *server) Serve(opt ...grpc.ServerOption) error {
 	return ss.Server.Serve(grpc.StatsHandler(ss))
 }
 
-func NewServer(port int32, regAddr string) lib.Server {
+func NewServer(port int, regAddr string) lib.Server {
 	info := lib.ServerInfo{
 		Type: lib.FeatureSession,
 		Port: port,
 	}
-	s := &sessionServer{
+	s := &server{
 		cache:   lib.NewSessionStoreServer(),
 		servers: make(map[uint64]uint16),
 	}
-	service := &sessionService{
+	service := &service{
 		s: s,
 	}
 	s.Server = lib.NewServer(info, []lib.Service{service})

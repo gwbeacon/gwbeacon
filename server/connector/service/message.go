@@ -1,17 +1,18 @@
 package service
 
 import (
-    "errors"
-    "fmt"
-    "google.golang.org/grpc/grpclog"
+	"errors"
+	"fmt"
 
-    "time"
+	"google.golang.org/grpc/grpclog"
 
-    "github.com/gwbeacon/gwbeacon/lib"
-    "github.com/gwbeacon/gwbeacon/lib/rpc"
-    "github.com/gwbeacon/sdk/v1"
-    "google.golang.org/grpc"
-    "google.golang.org/grpc/peer"
+	"time"
+
+	"github.com/gwbeacon/gwbeacon/lib"
+	"github.com/gwbeacon/gwbeacon/lib/rpc"
+	"github.com/gwbeacon/sdk/v1"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/peer"
 )
 
 type MessageService struct {
@@ -92,10 +93,10 @@ func (s *MessageService) OnChatMessage(stream v1.MessageService_OnChatMessageSer
 				st := connector.GetStream(ss.ID).(v1.MessageService_OnChatMessageServer)
 				err := st.Send(msg)
 				if err != nil {
-				    grpclog.Error(err)
-				    connector.Remove(ss)
-                    st.Context().Done()
-                }
+					grpclog.Error(err)
+					connector.Remove(ss)
+					st.Context().Done()
+				}
 			}
 		}
 	}

@@ -5,6 +5,10 @@ import (
 	"net"
 	"testing"
 
+	"github.com/grpc-ecosystem/go-grpc-middleware"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
+	"go.uber.org/zap"
+
 	"errors"
 
 	"github.com/gwbeacon/gwbeacon/lib"
@@ -38,8 +42,15 @@ func initServer(t *testing.T) {
 }
 
 func TestConnector(t *testing.T) {
-	//initServer(t)
-	conn, err := grpc.DialContext(context.Background(), "localhost:8888", grpc.WithInsecure())
+	initServer(t)
+	zapLogger, _ := zap.NewDevelopment(zap.Development(), zap.AddCaller())
+	zap.RedirectStdLog(zapLogger)
+	conn, err := grpc.DialContext(context.Background(), "localhost:8888", grpc.WithInsecure(),
+		grpc.WithUnaryInterceptor(grpc_middleware.ChainUnaryClient(
+			grpc_zap.UnaryClientInterceptor(zapLogger),
+		)),
+		grpc.WithStreamInterceptor(grpc_middleware.ChainStreamClient(grpc_zap.StreamClientInterceptor(zapLogger))),
+	)
 
 	if err != nil {
 		t.Fatal()

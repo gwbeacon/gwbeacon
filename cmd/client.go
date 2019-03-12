@@ -10,13 +10,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gwbeacon/gwbeacon/client"
+
 	"github.com/gwbeacon/gwbeacon/lib"
 	"github.com/gwbeacon/sdk/v1"
 	"golang.org/x/net/context"
-	"google.golang.org/grpc"
 )
 
-type client struct {
+type cli struct {
 	sync.RWMutex
 	v1.MessageServiceClient
 	v1.QueryServiceClient
@@ -33,7 +34,7 @@ type client struct {
 	notice  string
 }
 
-func (c *client) Login() error {
+func (c *cli) Login() error {
 	account := &v1.UserAccount{
 		Domain: c.domain,
 		Device: c.device,
@@ -48,7 +49,7 @@ func (c *client) Login() error {
 	return nil
 }
 
-func (c *client) Run() error {
+func (c *cli) Run() error {
 	ackCli, err := c.OnAckMessage(context.Background())
 	if err != nil {
 		return err
@@ -175,9 +176,9 @@ func (c *client) Run() error {
 	select {
 	case err := <-c.errCh:
 		log.Println(err)
-		ackCli.CloseSend()
-		hbCli.CloseSend()
-		msgCli.CloseSend()
+		_ = ackCli.CloseSend()
+		_ = hbCli.CloseSend()
+		_ = msgCli.CloseSend()
 		return err
 	}
 
@@ -190,12 +191,12 @@ func main() {
 	flag.StringVar(&addr, "server", "localhost:8888", "-server localhost:8888")
 	flag.StringVar(&user, "user", "Alice", "-user Alice")
 	flag.Parse()
-	conn, err := grpc.Dial(addr, grpc.WithInsecure())
+	conn, err := client.Dial(addr)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	cli := &client{
+	cli := &cli{
 		domain:               "mi.com",
 		device:               "goClient",
 		user:                 user,

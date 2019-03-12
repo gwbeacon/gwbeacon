@@ -1,16 +1,17 @@
-package main
+package connector
 
 import (
 	"fmt"
-	"google.golang.org/grpc/peer"
 	"log"
 	"reflect"
 
+	"google.golang.org/grpc/peer"
+
 	"sync"
 
-	_ "github.com/gwbeacon/gwbeacon/connector/service"
 	"github.com/gwbeacon/gwbeacon/lib"
 	"github.com/gwbeacon/gwbeacon/lib/rpc"
+	_ "github.com/gwbeacon/gwbeacon/server/connector/service"
 	context "golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/stats"
@@ -127,7 +128,7 @@ func (s *server) Serve(opt ...grpc.ServerOption) error {
 	return s.Server.Serve(grpc.StatsHandler(s))
 }
 
-func NewServer(port int32, regAddr string) lib.Connector {
+func NewServer(port int, regAddr string) lib.Connector {
 	info := lib.ServerInfo{
 		Port: port,
 		Type: lib.FeatureConnector,

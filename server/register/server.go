@@ -1,21 +1,24 @@
-package main
+package register
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"log"
 	"net"
 	"sync"
 
-	context "golang.org/x/net/context"
 	"google.golang.org/grpc"
+
+	"github.com/gwbeacon/gwbeacon/lib"
+
+	"golang.org/x/net/context"
 	"google.golang.org/grpc/peer"
 
 	"github.com/gwbeacon/gwbeacon/lib/rpc"
 )
 
 type server struct {
+	lib.Server
 	sync.Mutex
 	timeBase int32
 	ids      map[string]uint32
@@ -30,12 +33,36 @@ type StreamInfo struct {
 	serverDown chan *rpc.ServerInfo
 }
 
-func NewServer(timeBase int64) *server {
-	return &server{
+func NewServer(port int, timeBase int64) lib.Server {
+	info := lib.ServerInfo{
+		Type: lib.FeatureRegister,
+		Port: port,
+	}
+	s := &server{
 		timeBase: int32(timeBase),
 		ids:      make(map[string]uint32),
 		servers:  make(map[string]*rpc.ServerInfoIDMap),
 		streams:  make(map[string]*StreamInfo),
+	}
+	service := &service{
+		s: s,
+	}
+	s.Server = lib.NewServer(info, []lib.Service{service})
+	return s
+}
+
+type service struct {
+	s *server
+}
+
+func (ss *service) Register(gs *grpc.Server) {
+	rpc.RegisterClusterServer(gs, ss.s)
+}
+
+func (ss *service) GetInfo() *rpc.ServiceInfo {
+	return &rpc.ServiceInfo{
+		Name:    lib.FeatureSession,
+		Version: 1,
 	}
 }
 
@@ -68,7 +95,7 @@ func (s *server) getAllServers() map[string]*rpc.ServerInfoIDMap {
 	return ret
 }
 
-func (s *server) onServerUp(stream rpc.Cluster_RegisterServer, info *rpc.ServerInfo) {
+func (s *server) onServerUp(stream rpc.Cluster_DoRegisterServer, info *rpc.ServerInfo) {
 	ret := &rpc.RegisterReturn{
 		NewServers: make(map[string]*rpc.ServerInfoIDMap),
 	}
@@ -80,7 +107,7 @@ func (s *server) onServerUp(stream rpc.Cluster_RegisterServer, info *rpc.ServerI
 	log.Println(err)
 }
 
-func (s *server) onServerDown(stream rpc.Cluster_RegisterServer, info *rpc.ServerInfo) {
+func (s *server) onServerDown(stream rpc.Cluster_DoRegisterServer, info *rpc.ServerInfo) {
 	ret := &rpc.RegisterReturn{
 		DownServers: make(map[string]*rpc.ServerInfoIDMap),
 	}
@@ -92,7 +119,7 @@ func (s *server) onServerDown(stream rpc.Cluster_RegisterServer, info *rpc.Serve
 	log.Println(err)
 }
 
-func (s *server) Register(stream rpc.Cluster_RegisterServer) error {
+func (s *server) DoRegister(stream rpc.Cluster_DoRegisterServer) error {
 	s.Lock()
 	ctx := stream.Context()
 	p, ok := peer.FromContext(ctx)
@@ -133,7 +160,7 @@ func (s *server) Register(stream rpc.Cluster_RegisterServer) error {
 	}
 	log.Println("register server", info)
 
-	stream.Send(&rpc.RegisterReturn{
+	_ = stream.Send(&rpc.RegisterReturn{
 		ID:         info.ID,
 		NewServers: s.getAllServers(),
 	})
@@ -172,27 +199,9 @@ func (s *server) Register(stream rpc.Cluster_RegisterServer) error {
 			return err
 		}
 	}
-	return nil
+	//return nil
 }
 
 func (s *server) Sync(ctx context.Context, info *rpc.ServerInfo) (*rpc.RegisterReturn, error) {
 	return nil, nil
-}
-
-func main() {
-	var port = ""
-	var timeBase int64
-	flag.StringVar(&port, "port", "9999", "-port 9999")
-	flag.Int64Var(&timeBase, "timebase", 0, "-timebase 1534061219")
-	flag.Parse()
-	lis, err := net.Listen("tcp", ":"+port)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	server := grpc.NewServer()
-	rpc.RegisterClusterServer(server, NewServer(timeBase))
-	err = server.Serve(lis)
-	log.Println(err)
 }
